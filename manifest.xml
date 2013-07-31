@@ -1,0 +1,17 @@
+<package>
+  <description brief="gnrr">
+
+     gnrr
+
+  </description>
+  <author>Ben Kehoe</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gnrr</url>
+  <depend package="rospy"/>
+  <depend package="roscpp"/>
+  <depend package="tfx"/>
+
+</package>
+
+
