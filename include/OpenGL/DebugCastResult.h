@@ -16,8 +16,8 @@ subject to the following restrictions:
 #ifndef DEBUG_CAST_RESULT_H
 #define DEBUG_CAST_RESULT_H
 
-#include "BulletCollision/NarrowPhaseCollision/btConvexCast.h"
-#include "LinearMath/btTransform.h"
+#include  "BulletCollision/NarrowPhaseCollision/btConvexCast.h"
+#include  "LinearMath/btTransform.h"
 #include "GL_ShapeDrawer.h"
 #include "GlutStuff.h"
 #ifdef WIN32

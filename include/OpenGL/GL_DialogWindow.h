@@ -44,8 +44,8 @@ class btCollisionObject;
 #endif
 
 
-#include "LinearMath/btScalar.h"
-#include "LinearMath/btAlignedObjectArray.h"
+#include  "LinearMath/btScalar.h"
+#include  "LinearMath/btAlignedObjectArray.h"
 class btTypedConstraint;
 
 class GL_DialogWindow;

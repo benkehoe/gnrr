@@ -17,10 +17,10 @@ subject to the following restrictions:
 
 class btCollisionShape;
 class btShapeHull;
-#include "LinearMath/btAlignedObjectArray.h"
-#include "LinearMath/btVector3.h"
+#include  "LinearMath/btAlignedObjectArray.h"
+#include  "LinearMath/btVector3.h"
 
-#include "BulletCollision/CollisionShapes/btShapeHull.h"
+#include  "BulletCollision/CollisionShapes/btShapeHull.h"
 
 /// OpenGL shape drawing
 class GL_ShapeDrawer

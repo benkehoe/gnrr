@@ -85,5 +85,9 @@ target_link_libraries(OpenGLSupport ${GLUT_glut_LIBRARY} ${OPENGL_gl_LIBRARY} ${
 #rosbuild_add_library(${PROJECT_NAME} src/example.cpp)
 #target_link_libraries(${PROJECT_NAME} bullet)
 
-rosbuild_add_executable(gnrr_test src/gnrr/main.cpp src/gnrr/GraspTest.cpp)
+rosbuild_add_executable(gnrr_test src/gnrr/GraspTest.cpp)
 target_link_libraries(gnrr_test OpenGLSupport  BulletWorldImporter BulletDynamics  BulletCollision LinearMath  BulletFileLoader  ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
+
+rosbuild_add_executable(gnrr src/gnrr/gnrr.cpp)
+target_link_libraries(gnrr OpenGLSupport  BulletWorldImporter BulletDynamics  BulletCollision LinearMath  BulletFileLoader  ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY})
+

@@ -25,7 +25,7 @@ subject to the following restrictions:
 #include "OpenGL/GLDebugFont.h"
 #include <stdio.h> //printf debugging
 
-#include "GraspTest.h"
+#include "gnrr.h"
 #include "OpenGL/GL_ShapeDrawer.h"
 #include "OpenGL/GlutStuff.h"
 
@@ -34,42 +34,14 @@ static GLDebugDrawer	gDebugDrawer;
 
 
 
-const int numObjects = 3;
-
-#define ENABLE_ALL_DEMOS 1
-
-#define CUBE_HALF_EXTENTS 1.f
-
 #define SIMD_PI_2 ((SIMD_PI)*0.5f)
 #define SIMD_PI_4 ((SIMD_PI)*0.25f)
 
 
 
 
-btTransform sliderTransform;
-btVector3 lowerSliderLimit = btVector3(-10,0,0);
-btVector3 hiSliderLimit = btVector3(10,0,0);
-
-btRigidBody* d6body0 =0;
-
-btHingeConstraint* spDoorHinge = NULL;
-btHingeConstraint* spHingeDynAB = NULL;
-btGeneric6DofConstraint* spSlider6Dof = NULL;
-
-static bool s_bTestConeTwistMotor = false;
-
 float scale = 10.;
 float mass_exp = 1;
-
-btRigidBody* link0 =0;
-btRigidBody* link1 =0;
-btRigidBody* link2 =0;
-btRigidBody* link3 =0;
-
-btGeneric6DofSpringConstraint* c1w = 0;
-btGeneric6DofSpringConstraint* c12 = 0;
-btGeneric6DofSpringConstraint* c23 = 0;
-btGeneric6DofSpringConstraint* c3w = 0;
 
 btRigidBody* handbase =0;
 btRigidBody* handbase_finger20 =0;
@@ -104,6 +76,7 @@ btGearConstraint* jf3_gear = 0;
 
 btGeneric6DofSpringConstraint* p2p = 0;
 
+/*
 void	drawLimit()
 {
 		btVector3 from = sliderTransform*lowerSliderLimit;
@@ -122,9 +95,10 @@ void	drawLimit()
 		}
 		glEnd();
 }
+*/
 
 
-void	GraspTest::setupEmptyDynamicsWorld()
+void	GNRR::setupEmptyDynamicsWorld()
 {
 	m_collisionConfiguration = new btDefaultCollisionConfiguration();
 	m_dispatcher = new btCollisionDispatcher(m_collisionConfiguration);
@@ -134,12 +108,12 @@ void	GraspTest::setupEmptyDynamicsWorld()
 
 }
 
-void	GraspTest::clientResetScene()
+void	GNRR::clientResetScene()
 {
 	exitPhysics();
 	initPhysics();
 }
-void	GraspTest::initPhysics()
+void	GNRR::initPhysics()
 {
 	setTexturing(true);
 	setShadows(true);
@@ -154,6 +128,7 @@ void	GraspTest::initPhysics()
 	m_dynamicsWorld->setGravity(btVector3(0.,0.,0.));
 
 
+	/*
 	//btCollisionShape* groundShape = new btBoxShape(btVector3(btScalar(50.),btScalar(40.),btScalar(50.)));
 	btCollisionShape* groundShape = new btStaticPlaneShape(btVector3(0,1,0),40);
 
@@ -166,11 +141,7 @@ void	GraspTest::initPhysics()
 
 
 
-	btCollisionShape* shape = new btBoxShape(btVector3(CUBE_HALF_EXTENTS,0.05,0.05));
-	m_collisionShapes.push_back(shape);
-	btTransform trans;
-	trans.setIdentity();
-	trans.setOrigin(btVector3(0,20,0));
+	*/
 
 	float mass = 1.f;
 	
@@ -182,10 +153,12 @@ void	GraspTest::initPhysics()
 		
 		float fingerX0_width = 0.01;
 		btCollisionShape* fingerX0_shape = new btBoxShape(btVector3(scale*0.05/2, scale*fingerX0_width/2, scale*0.034/2));
+		m_collisionShapes.push_back(fingerX0_shape);
 		
 		/***************** handbase ******************/
 		
 		btCompoundShape* handbase_shape = new btCompoundShape();
+		m_collisionShapes.push_back(handbase_shape);
 		
 		childTransform.setIdentity();
 		childTransform.setOrigin(btVector3(0,0,scale*0.0415/2));
@@ -206,6 +179,7 @@ void	GraspTest::initPhysics()
 		/******** finger00 *********/
 		
 		btCompoundShape* finger00_shape = new btCompoundShape();
+		m_collisionShapes.push_back(finger00_shape);
 		
 		childTransform.setIdentity();
 		childTransform.setOrigin(btVector3(scale*0.05/2, 0, scale*0.034/2));
@@ -222,6 +196,7 @@ void	GraspTest::initPhysics()
 		/******** finger10 *********/
 		
 		btCompoundShape* finger10_shape = new btCompoundShape();
+		m_collisionShapes.push_back(finger10_shape);
 		
 		childTransform.setIdentity();
 		childTransform.setOrigin(btVector3(scale*0.05/2, 0, scale*0.034/2));
@@ -251,7 +226,9 @@ void	GraspTest::initPhysics()
 		
 		float fingerX1_radius = 0.01;
 		btCollisionShape* fingerX1_capsule_shape = new btCapsuleShapeX(scale * fingerX1_radius, scale * (0.07 - 2 * fingerX1_radius));
+		m_collisionShapes.push_back(fingerX1_capsule_shape);
 		btCompoundShape* fingerX1_shape = new btCompoundShape();
+		m_collisionShapes.push_back(fingerX1_shape);
 		
 		childTransform.setIdentity();
 		childTransform.setOrigin(btVector3(scale*0.07/2, 0, 0));
@@ -294,7 +271,9 @@ void	GraspTest::initPhysics()
 		
 		float fingerX2_radius = 0.01;
 		btCollisionShape* fingerX2_capsule_shape = new btCapsuleShapeX(scale * fingerX2_radius, scale * (0.058 - 2 * fingerX2_radius));
+		m_collisionShapes.push_back(fingerX2_capsule_shape);
 		btCompoundShape* fingerX2_shape = new btCompoundShape();
+		m_collisionShapes.push_back(fingerX2_shape);
 		
 		childTransform.setIdentity();
 		childTransform.setOrigin(btVector3(scale*0.058/2, 0, 0));
@@ -592,100 +571,9 @@ void	GraspTest::initPhysics()
 		}
 		
 	}
-
-
-	if (false) {
-		{
-
-			btTransform tr;
-			tr.setIdentity();
-			tr.setOrigin(btVector3(btScalar(0.), btScalar(0.), btScalar(0.)));
-			tr.getBasis().setEulerZYX(0,0,0);
-			link1 = localCreateRigidBody( 1.0, tr, shape);
-			link1->setActivationState(DISABLE_DEACTIVATION);
-
-			tr.setIdentity();
-			tr.setOrigin(btVector3(btScalar(2.), btScalar(0.), btScalar(0.)));
-			tr.getBasis().setEulerZYX(0,0,0);
-			btRigidBody* link2 = localCreateRigidBody(1.0, tr, shape);
-			link2->setActivationState(DISABLE_DEACTIVATION);
-
-			btTransform frameInA, frameInB;
-			frameInA = btTransform::getIdentity();
-			frameInA.setOrigin(btVector3(btScalar(1.), btScalar(0.), btScalar(0.)));
-			frameInB = btTransform::getIdentity();
-			frameInB.setOrigin(btVector3(btScalar(-1.), btScalar(0.), btScalar(0.)));
-
-			c12 = new btGeneric6DofSpringConstraint(*link1, *link2, frameInA, frameInB, true);
-			c12->setLinearUpperLimit(btVector3(0., 0., 0.));
-			c12->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-			c12->setAngularLowerLimit(btVector3(0.f, 0.f, -1.5f));
-			c12->setAngularUpperLimit(btVector3(0.f, 0.f, 1.5f));
-
-			m_dynamicsWorld->addConstraint(c12, true);
-			c12->setDbgDrawSize(btScalar(2.5f));
-		
-			//c12->enableSpring(0, true);
-			//c12->setStiffness(0, 39.478f);
-			//c12->setDamping(0, 0.5f);
-			//c12->enableSpring(5, true);
-			//c12->setStiffness(5, 39.478f);
-			//c12->setDamping(5, 0.3f);
-			//c12->setEquilibriumPoint(5,-1.5f/3);
-		
-			tr.setIdentity();
-			tr.setOrigin(btVector3(btScalar(4.), btScalar(0.), btScalar(0.)));
-			tr.getBasis().setEulerZYX(0,0,0);
-			link3 = localCreateRigidBody(1.0, tr, shape);
-			link3->setActivationState(DISABLE_DEACTIVATION);
-		
-			c23 = new btGeneric6DofSpringConstraint(*link2, *link3, frameInA, frameInB, true);
-			c23->setLinearUpperLimit(btVector3(0., 0., 0.));
-			c23->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-			c23->setAngularLowerLimit(btVector3(0.f, 0.f, -1.5f));
-			c23->setAngularUpperLimit(btVector3(0.f, 0.f, 1.5f));
-
-			m_dynamicsWorld->addConstraint(c23, true);
-			c23->setDbgDrawSize(btScalar(2.5f));
-		}
-	
-		{
-			btTransform frameInA;
-			frameInA = btTransform::getIdentity();
-			frameInA.setOrigin(btVector3(btScalar(-1), btScalar(0.), btScalar(0.)));
-		
-			c1w = new btGeneric6DofSpringConstraint(*link1, frameInA, true);
-			c1w->setLinearUpperLimit(btVector3(0., 0., 0.));
-			c1w->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-			c1w->setAngularLowerLimit(btVector3(0.f, 0.f, -1.5f));
-			c1w->setAngularUpperLimit(btVector3(0.f, 0.f, 1.5f));
-
-			m_dynamicsWorld->addConstraint(c1w, true);
-			c1w->setDbgDrawSize(btScalar(5.f));
-		}
-	
-		{
-			btTransform frameInA;
-			frameInA = btTransform::getIdentity();
-			frameInA.setOrigin(btVector3(btScalar(1), btScalar(0.), btScalar(0.)));
-		
-			c3w = new btGeneric6DofSpringConstraint(*link3, frameInA, true);
-			c3w->setLinearUpperLimit(btVector3(-0.5, 0., 0.));
-			c3w->setLinearLowerLimit(btVector3(-0.5, 0., 0.));
-
-			c3w->setAngularLowerLimit(btVector3(0.f, 0.f, -1.5f));
-			c3w->setAngularUpperLimit(btVector3(0.f, 0.f, 1.5f));
-
-			m_dynamicsWorld->addConstraint(c3w, true);
-			c3w->setDbgDrawSize(btScalar(5.f));
-		}
-	}
 }
 
-void	GraspTest::exitPhysics()
+void	GNRR::exitPhysics()
 {
 
 		int i;
@@ -697,7 +585,6 @@ void	GraspTest::exitPhysics()
 		m_dynamicsWorld->removeConstraint(constraint);
 		delete constraint;
 	}
-	m_ctc = NULL;
 
 	//remove the rigidbodies from the dynamics world and delete them
 	for (i=m_dynamicsWorld->getNumCollisionObjects()-1; i>=0 ;i--)
@@ -740,7 +627,7 @@ void	GraspTest::exitPhysics()
 
 }
 
-GraspTest::~GraspTest()
+GNRR::~GNRR()
 {
 	//cleanup in the reverse order of creation/initialization
 
@@ -749,7 +636,7 @@ GraspTest::~GraspTest()
 }
 
 
-void GraspTest::clientMoveAndDisplay()
+void GNRR::clientMoveAndDisplay()
 {
 	
  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
@@ -759,88 +646,12 @@ void GraspTest::clientMoveAndDisplay()
 
 	// drive cone-twist motor
 	m_Time += 0.03f;
-	if (s_bTestConeTwistMotor)
-	{  // this works only for obsolete constraint solver for now
-		// build cone target
-		btScalar t = 1.25f*m_Time;
-		btVector3 axis(0,sin(t),cos(t));
-		axis.normalize();
-		btQuaternion q1(axis, 0.75f*SIMD_PI);
-
-		// build twist target
-		//btQuaternion q2(0,0,0);
-		//btQuaternion q2(btVehictor3(1,0,0), -0.3*sin(m_Time));
-		btQuaternion q2(btVector3(1,0,0), -1.49f*btSin(1.5f*m_Time));
-
-		// compose cone + twist and set target
-		q1 = q1 * q2;
-		m_ctc->enableMotor(true);
-		m_ctc->setMotorTargetInConstraintSpace(q1);
-	}
-	
-	if (c1w) {
-		c1w->setLinearLowerLimit(btVector3(0., 0.5 * sin(m_Time), 0.));
-		c1w->setLinearUpperLimit(btVector3(0., 0.5 * sin(m_Time), 0.));
-	}
-	
 	if (p2p) {
 		btVector3 pt = finger22->getCenterOfMassTransform() * btVector3(scale*0.058,0,0);
 		//printf("%f %f %f\n",pt.getX(), pt.getY(), pt.getZ());
 		//printf("%f %f %f\n",p2p->getRelativePivotPosition(0),p2p->getRelativePivotPosition(1),p2p->getRelativePivotPosition(2));
 	}
 	
-	bool mimic = false;
-	
-	if (mimic) {	
-		if (j_00_01_jf1 && j_01_02_jf1mimic && true) {
-			j_00_01_jf1->calculateTransforms();
-			btTransform tfA = j_00_01_jf1->getCalculatedTransformA();
-			btTransform tfB = j_00_01_jf1->getCalculatedTransformB();
-			btTransform tfAB = tfB.inverseTimes(tfA);
-			btScalar angle = tfAB.getRotation().getAngle();
-		
-			btScalar mimicAngle = angle / 3. + 0.8727;
-		
-			j_01_02_jf1mimic->setLimit(5,mimicAngle,mimicAngle);
-		}
-	
-		if (j_10_11_jf2 && j_11_12_jf2mimic && true) {
-			j_10_11_jf2->calculateTransforms();
-			btTransform tfA = j_10_11_jf2->getCalculatedTransformA();
-			btTransform tfB = j_10_11_jf2->getCalculatedTransformB();
-			btTransform tfAB = tfB.inverseTimes(tfA);
-			btScalar angle = tfAB.getRotation().getAngle();
-		
-			btScalar mimicAngle = angle / 3. + 0.8727;
-		
-			j_11_12_jf2mimic->setLimit(5,mimicAngle,mimicAngle);
-		}
-	
-		if (j_20_21_jf3 && j_21_22_jf3mimic && true) {
-			j_20_21_jf3->calculateTransforms();
-			btTransform tfA = j_20_21_jf3->getCalculatedTransformA();
-			btTransform tfB = j_20_21_jf3->getCalculatedTransformB();
-			btTransform tfAB = tfB.inverseTimes(tfA);
-			btScalar angle = tfAB.getRotation().getAngle();
-		
-			btScalar mimicAngle = angle / 3. + 0.8727;
-		
-			j_21_22_jf3mimic->setLimit(5,mimicAngle,mimicAngle);
-		}
-		
-		if (j_hb_00_jf4 && j_hb_10_jf4mimic && false) {
-			j_hb_00_jf4->calculateTransforms();
-			btTransform tfA = j_hb_00_jf4->getCalculatedTransformA();
-			btTransform tfB = j_hb_00_jf4->getCalculatedTransformB();
-			btTransform tfAB = tfB.inverseTimes(tfA);
-			btScalar angle = tfAB.getRotation().getAngle();
-		
-			btScalar mimicAngle = SIMD_PI - angle;
-		
-			j_hb_10_jf4mimic->setLimit(5,mimicAngle,mimicAngle);
-		}
-	}
-
 	{
 		static bool once = true;
 		if ( m_dynamicsWorld->getDebugDrawer() && once)
@@ -895,7 +706,7 @@ void GraspTest::clientMoveAndDisplay()
 
 
 
-void GraspTest::displayCallback(void) {
+void GNRR::displayCallback(void) {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
 
@@ -911,7 +722,7 @@ void GraspTest::displayCallback(void) {
 }
 
 
-void GraspTest::keyboardCallback(unsigned char key, int x, int y)
+void GNRR::keyboardCallback(unsigned char key, int x, int y)
 {
 	(void)x;
 	(void)y;
@@ -920,27 +731,27 @@ void GraspTest::keyboardCallback(unsigned char key, int x, int y)
 		case 'O' :
 			{
 				bool offectOnOff;
-				if(spDoorHinge)
-				{
-					offectOnOff = spDoorHinge->getUseFrameOffset();
-					offectOnOff = !offectOnOff;
-					spDoorHinge->setUseFrameOffset(offectOnOff);
-					printf("DoorHinge %s frame offset\n", offectOnOff ? "uses" : "does not use");
-				}
-				if(spHingeDynAB)
-				{
-					offectOnOff = spHingeDynAB->getUseFrameOffset();
-					offectOnOff = !offectOnOff;
-					spHingeDynAB->setUseFrameOffset(offectOnOff);
-					printf("HingeDynAB %s frame offset\n", offectOnOff ? "uses" : "does not use");
-				}
-				if(spSlider6Dof)
-				{
-					offectOnOff = spSlider6Dof->getUseFrameOffset();
-					offectOnOff = !offectOnOff;
-					spSlider6Dof->setUseFrameOffset(offectOnOff);
-					printf("Slider6Dof %s frame offset\n", offectOnOff ? "uses" : "does not use");
-				}
+//				if(spDoorHinge)
+//				{
+//					offectOnOff = spDoorHinge->getUseFrameOffset();
+//					offectOnOff = !offectOnOff;
+//					spDoorHinge->setUseFrameOffset(offectOnOff);
+//					printf("DoorHinge %s frame offset\n", offectOnOff ? "uses" : "does not use");
+//				}
+//				if(spHingeDynAB)
+//				{
+//					offectOnOff = spHingeDynAB->getUseFrameOffset();
+//					offectOnOff = !offectOnOff;
+//					spHingeDynAB->setUseFrameOffset(offectOnOff);
+//					printf("HingeDynAB %s frame offset\n", offectOnOff ? "uses" : "does not use");
+//				}
+//				if(spSlider6Dof)
+//				{
+//					offectOnOff = spSlider6Dof->getUseFrameOffset();
+//					offectOnOff = !offectOnOff;
+//					spSlider6Dof->setUseFrameOffset(offectOnOff);
+//					printf("Slider6Dof %s frame offset\n", offectOnOff ? "uses" : "does not use");
+//				}
 			}
 			break;
 		default : 
@@ -953,14 +764,15 @@ void GraspTest::keyboardCallback(unsigned char key, int x, int y)
 
 int main(int argc,char** argv)
 {
+	//Load meshes
+
+	//init grasp
+
+    GNRR* gnrr = new GNRR();
 
 
+    gnrr->initPhysics();
+	gnrr->setDebugMode(btIDebugDraw::DBG_DrawConstraints+btIDebugDraw::DBG_DrawConstraintLimits);
 
-    GraspTest* graspTest = new GraspTest();
-
-
-    graspTest->initPhysics();
-	graspTest->setDebugMode(btIDebugDraw::DBG_DrawConstraints+btIDebugDraw::DBG_DrawConstraintLimits);
-
-	return glutmain(argc, argv,640,480,"Grasper Test",graspTest);
+	return glutmain(argc, argv,640,480,"GNRR",gnrr);
 }

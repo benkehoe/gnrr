@@ -538,7 +538,6 @@ void DemoApplication::moveAndDisplay()
 		clientMoveAndDisplay();
 	else
  		displayCallback();
- 	printf("%f %f %f\n",m_cameraPosition[0],m_cameraPosition[1],m_cameraPosition[2]);
 }
 
 

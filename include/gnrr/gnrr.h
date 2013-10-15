@@ -19,7 +19,7 @@ subject to the following restrictions:
 #define PlatformDemoApplication GlutDemoApplication
 
 ///GraspTest shows how to create a constraint, like Hinge or btGenericD6constraint
-class GraspTest : public PlatformDemoApplication
+class GNRR : public PlatformDemoApplication
 {
 	//keep track of variables to delete memory at the end
 	btAlignedObjectArray<btCollisionShape*> m_collisionShapes;
@@ -40,7 +40,7 @@ class GraspTest : public PlatformDemoApplication
 	public:
 
 
-	virtual ~GraspTest();
+	virtual ~GNRR();
 
 	void	initPhysics();
 
@@ -52,7 +52,7 @@ class GraspTest : public PlatformDemoApplication
 
 	static DemoApplication* Create()
 	{
-		GraspTest* demo = new GraspTest();
+		GNRR* demo = new GNRR();
 		demo->myinit();
 		demo->initPhysics();
 		return demo;
@@ -62,8 +62,15 @@ class GraspTest : public PlatformDemoApplication
 
 	// for cone-twist motor driving
 	float m_Time;
-	class btConeTwistConstraint* m_ctc;
 	
+};
+
+class Mesh {
+	btDynamicsWorld* m_dynamicsWorld;
+};
+
+class Gripper {
+	btDynamicsWorld* m_dynamicsWorld;
 };
 
 #endif //CONSTRAINT_DEMO_H

@@ -31,8 +31,8 @@ struct GL_ToggleControl;
 struct GL_SliderControl;
 
 
-#include "LinearMath/btAlignedObjectArray.h"
-#include "LinearMath/btVector3.h"
+#include  "LinearMath/btAlignedObjectArray.h"
+#include  "LinearMath/btVector3.h"
 
 class GL_DialogDynamicsWorld
 {
