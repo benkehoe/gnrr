@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+#include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+include(/opt/ros/groovy/share/ros/core/rosbuild/rosbuild.cmake) #bullet included with fuerte doesn't work
 
 # Set the build type.  Options are:
 #  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage

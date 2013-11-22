@@ -326,25 +326,25 @@ void DemoApplication::keyboardCallback(unsigned char key, int x, int y)
 
 	switch (key) 
 	{
-	case 8:
-		{
-			int numObj = getDynamicsWorld()->getNumCollisionObjects();
-			if (numObj)
-			{
-				btCollisionObject* obj = getDynamicsWorld()->getCollisionObjectArray()[numObj-1];
-
-				getDynamicsWorld()->removeCollisionObject(obj);
-				btRigidBody* body = btRigidBody::upcast(obj);
-				if (body && body->getMotionState())
-				{
-					delete body->getMotionState();					
-				}
-				delete obj;
-
-
-			}
-			break;
-		}
+//	case 8:
+//		{
+//			int numObj = getDynamicsWorld()->getNumCollisionObjects();
+//			if (numObj)
+//			{
+//				btCollisionObject* obj = getDynamicsWorld()->getCollisionObjectArray()[numObj-1];
+//
+//				getDynamicsWorld()->removeCollisionObject(obj);
+//				btRigidBody* body = btRigidBody::upcast(obj);
+//				if (body && body->getMotionState())
+//				{
+//					delete body->getMotionState();
+//				}
+//				delete obj;
+//
+//
+//			}
+//			break;
+//		}
 	case 'q' : 
 #ifdef BT_USE_FREEGLUT
 		//return from glutMainLoop(), detect memory leaks etc.
@@ -479,7 +479,7 @@ void DemoApplication::keyboardCallback(unsigned char key, int x, int y)
 		}
 	case 's' : clientMoveAndDisplay(); break;
 		//    case ' ' : newRandom(); break;
-	case ' ':
+	case '\b':
 		clientResetScene();
 		break;
 	case '1':
