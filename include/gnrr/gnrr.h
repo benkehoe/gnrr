@@ -18,12 +18,18 @@ subject to the following restrictions:
 #include "OpenGL/GlutDemoApplication.h"
 #define PlatformDemoApplication GlutDemoApplication
 
+#define SIMD_PI_2 ((SIMD_PI)*0.5f)
+#define SIMD_PI_4 ((SIMD_PI)*0.25f)
+
 class GNRR;
 
-struct HandState {
-	btScalar scale;
+struct JointState {
+	JointState();
+	JointState(const GNRR* gnrr);
+	void update(const GNRR* gnrr);
 
-	btTransform basePose;
+	btScalar getValue(int finger, int joint) const;
+
 	btScalar spread;
 	btScalar finger1;
 	btScalar finger2;
@@ -34,38 +40,83 @@ struct HandState {
 	btScalar finger2a;
 	btScalar finger3a;
 
-	HandState(const GNRR* gnrr);
+	std::string toString(bool all=false) const;
+};
 
+struct HandState {
+	btTransform basePose;
+
+	JointState joints;
+
+	HandState(const GNRR* gnrr);
 	void update(const GNRR* gnrr);
 
-	btScalar getJoint(int finger, int joint) const;
+	btScalar getJointValue(int finger, int joint) const;
 	btTransform getLinkFrame(int finger, int link) const;
 	btTransform getFingertipPose(int finger) const;
 
 	std::string toString() const;
 };
 
+class JointConstraint : public btGeneric6DofSpringConstraint {
+public:
+	JointConstraint(btRigidBody& rA, btRigidBody& rB, const btTransform& frameInA, const btTransform& frameInB);
+
+	btScalar getAngle();
+	btScalar getAngle(int index);
+	void setAngle(btScalar angle);
+
+	void enableSpring();
+	void disableSpring();
+	bool isSprung();
+
+	bool springEnabled(int index);
+	bool getStiffness(int index);
+	bool getDamping(int index);
+	btScalar getEquilibriumPoint(int index);
+};
+
+class ContactConstraint : public btGeneric6DofSpringConstraint {
+public:
+	ContactConstraint(btRigidBody& rb, const btTransform& frame);
+
+	btVector3 getPoint();
+	void setPoint(const btVector3& point);
+
+	void enableSpring();
+	void disableSpring();
+	bool isSprung();
+
+	bool springEnabled(int index);
+	bool getStiffness(int index);
+	bool getDamping(int index);
+	btScalar getEquilibriumPoint(int index);
+};
+
 class GNRR : public PlatformDemoApplication
 {
+
 	//keep track of variables to delete memory at the end
 	btAlignedObjectArray<btCollisionShape*> m_collisionShapes;
 
-	class btBroadphaseInterface*	m_overlappingPairCache;
+	class btBroadphaseInterface* m_overlappingPairCache;
 
-	class btCollisionDispatcher*	m_dispatcher;
+	class btCollisionDispatcher* m_dispatcher;
 
-	class btConstraintSolver*	m_constraintSolver;
+	class btConstraintSolver* m_constraintSolver;
 
 	class btDefaultCollisionConfiguration* m_collisionConfiguration;
 
-	void	setupEmptyDynamicsWorld();
+	void setupEmptyDynamicsWorld();
 
-	void	clientResetScene();
+	void clientResetScene();
 
+	void setupConstraints(HandState& state);
 
-	public:
+public:
 
-	GNRR(float scale=10.);
+	static btScalar scale;
+	GNRR();
 	virtual ~GNRR();
 
 	void	initPhysics();
@@ -91,12 +142,11 @@ class GNRR : public PlatformDemoApplication
 	// for cone-twist motor driving
 	float m_time;
 
-	btTransform getBasePose();
-	btTransform getFingertipPose(int finger);
+	HandState getState();
 	
 	void setBaseConstraintPose(const btTransform& pose, bool constrainAngles=false);
 	void releaseBaseConstraint();
-	void setFingerConstraintPose(int finger, const btTransform& pose, bool constrainAngles=false);
+	void setFingerConstraintPose(int finger, const btTransform& pose, btScalar angle=0, bool constrainAngles=false);
 
 //	void 	enableSpring (int index, bool onOff)
 //	void 	setStiffness (int index, btScalar stiffness)
@@ -107,7 +157,6 @@ class GNRR : public PlatformDemoApplication
 
 	bool inTimeRange(float start, float stop, float& value);
 
-	float scale;
 	float mass_exp;
 
 	btRigidBody* handbase;
@@ -124,29 +173,122 @@ class GNRR : public PlatformDemoApplication
 	btRigidBody* finger32;
 	btRigidBody* finger33;
 
-	btGeneric6DofSpringConstraint* j_hb_11_jf4;
-	btGeneric6DofSpringConstraint* j_hb_21_jf4mimic;
+	JointConstraint* j_hb_11_jf4;
+	JointConstraint* j_hb_21_jf4mimic;
 	btGearConstraint* jf4_gear;
-	btGeneric6DofSpringConstraint* j_hb_31_fixed;
+	JointConstraint* j_hb_31_fixed;
 
-	btGeneric6DofSpringConstraint* j_11_12_jf1;
-	btGeneric6DofSpringConstraint* j_12_13_jf1mimic;
+	JointConstraint* j_11_12_jf1;
+	JointConstraint* j_12_13_jf1mimic;
 	btGearConstraint* jf1_gear;
 
-	btGeneric6DofSpringConstraint* j_21_22_jf2;
-	btGeneric6DofSpringConstraint* j_22_23_jf2mimic;
+	JointConstraint* j_21_22_jf2;
+	JointConstraint* j_22_23_jf2mimic;
 	btGearConstraint* jf2_gear;
 
-	btGeneric6DofSpringConstraint* j_31_32_jf3;
-	btGeneric6DofSpringConstraint* j_32_33_jf3mimic;
+	JointConstraint* j_31_32_jf3;
+	JointConstraint* j_32_33_jf3mimic;
 	btGearConstraint* jf3_gear;
 
 	btGeneric6DofSpringConstraint* p2p;
 
-	btGeneric6DofSpringConstraint* baseConstraint;
-	btGeneric6DofSpringConstraint* finger1Constraint;
-	btGeneric6DofSpringConstraint* finger2Constraint;
-	btGeneric6DofSpringConstraint* finger3Constraint;
+	ContactConstraint* baseConstraint;
+	ContactConstraint* finger1Constraint;
+	ContactConstraint* finger2Constraint;
+	ContactConstraint* finger3Constraint;
+
+	inline btRigidBody* getLink(int finger, int link) {
+		switch (finger) {
+		case 1:
+			switch (link) {
+			case 1:
+				return finger11;
+			case 2:
+				return finger12;
+			case 3:
+				return finger13;
+			default:
+				return 0;
+			}
+		case 2:
+			switch (link) {
+			case 1:
+				return finger21;
+			case 2:
+				return finger22;
+			case 3:
+				return finger23;
+			default:
+				return 0;
+			}
+		case 3:
+			switch (link) {
+			case 1:
+				return 0;
+			case 2:
+				return finger32;
+			case 3:
+				return finger33;
+			default:
+				return 0;
+			}
+		default:
+			return 0;
+		}
+	}
+
+	inline JointConstraint* getJointConstraint(int finger, int joint) {
+			switch (finger) {
+			case 1:
+				switch (joint) {
+				case 0:
+					return j_hb_11_jf4;
+				case 1:
+					return j_11_12_jf1;
+				case 2:
+					return j_12_13_jf1mimic;
+				default:
+					return 0;
+				}
+			case 2:
+				switch (joint) {
+				case 0:
+					return j_hb_21_jf4mimic;
+				case 1:
+					return j_21_22_jf2;
+				case 2:
+					return j_22_23_jf2mimic;
+				default:
+					return 0;
+				}
+			case 3:
+				switch (joint) {
+				case 0:
+					return 0;
+				case 1:
+					return j_31_32_jf3;
+				case 2:
+					return j_32_33_jf3mimic;
+				default:
+					return 0;
+				}
+			default:
+				return 0;
+			}
+		}
+
+	inline ContactConstraint* getContactConstraint(int finger) {
+		switch (finger) {
+		case 1:
+			return finger1Constraint;
+		case 2:
+			return finger2Constraint;
+		case 3:
+			return finger3Constraint;
+		default:
+			return 0;
+		}
+	}
 };
 
 class Mesh {
