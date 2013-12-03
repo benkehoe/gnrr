@@ -60,6 +60,21 @@ inline btTransform interpolate(const btTransform& start, const btTransform& end,
 	return btTransform(r,p);
 }
 
+inline JointState interpolate(const JointState& start, const JointState& end, btScalar value) {
+	JointState interp;
+	interp.spread = interpolate(start.spread, end.spread, value);
+	interp.finger1 = interpolate(start.finger1, end.finger1, value);
+	interp.finger2 = interpolate(start.finger2, end.finger2, value);
+	interp.finger3 = interpolate(start.finger3, end.finger3, value);
+
+	interp.spreada = interpolate(start.spreada, end.spreada, value);
+	interp.finger1a = interpolate(start.finger1a, end.finger1a, value);
+	interp.finger2a = interpolate(start.finger2a, end.finger2a, value);
+	interp.finger3a = interpolate(start.finger3a, end.finger3a, value);
+
+	return interp;
+}
+
 inline std::string toString(const btVector3& vector) {
 	char s[50];
 	sprintf(s, "(% .3f, % .3f, % .3f)", vector.getX(), vector.getY(), vector.getZ());
@@ -193,6 +208,10 @@ inline std::ostream& operator<<(std::ostream& o, const JointState& obj) {
 	return o;
 }
 
+HandState::HandState(const btTransform& theBasePose, const JointState& jointState) :
+		basePose(theBasePose), joints(jointState) {
+}
+
 HandState::HandState(const GNRR* gnrr) {
 	update(gnrr);
 }
@@ -273,9 +292,16 @@ inline std::ostream& operator<<(std::ostream& o, const HandState& obj) {
 	return o;
 }
 
-JointConstraint::JointConstraint(btRigidBody& rA, btRigidBody& rB, const btTransform& frameInA, const btTransform& frameInB) :
-		btGeneric6DofSpringConstraint(rA, rB, frameInA, frameInB, true) {
+JointConstraint::JointConstraint(btRigidBody& rA, btRigidBody& rB,
+		const btTransform& frameInA, const btTransform& frameInB,
+		btScalar theLowerLimit, btScalar theUpperLimit) :
+		btGeneric6DofSpringConstraint(rA, rB, frameInA, frameInB, true), lowerLimit(theLowerLimit), upperLimit(theUpperLimit) {
 
+	setLinearUpperLimit(btVector3(0., 0., 0.));
+	setLinearLowerLimit(btVector3(0., 0., 0.));
+
+	setAngularLowerLimit(btVector3(0.f, 0.f, lowerLimit));
+	setAngularUpperLimit(btVector3(0.f, 0.f, upperLimit));
 }
 
 btScalar JointConstraint::getAngle() {
@@ -287,45 +313,43 @@ btScalar JointConstraint::getAngle(int index) {
 }
 
 void JointConstraint::setAngle(btScalar angle) {
-	btScalar fudge = 5. * SIMD_PI / 180.;
-	btVector3 lower, upper;
-	getAngularLowerLimit(lower);
-	getAngularUpperLimit(upper);
-	lower.setZ(angle);
-	upper.setZ(angle);
 	if (isSprung()) {
-		lower += btVector3(0,0,fudge);
-		upper -= btVector3(0,0,fudge);
+		setEquilibriumPoint(5, angle);
+	} else {
+		btVector3 lower, upper;
+		getAngularLowerLimit(lower);
+		getAngularUpperLimit(upper);
+		lower.setZ(angle);
+		upper.setZ(angle);
+		setAngularLowerLimit(lower);
+		setAngularUpperLimit(upper);
 	}
-	setAngularLowerLimit(lower);
-	setAngularUpperLimit(upper);
 }
 
-void JointConstraint::enableSpring() {
+void JointConstraint::setFree() {
+	setAngularLowerLimit(btVector3(0.f, 0.f, lowerLimit));
+	setAngularUpperLimit(btVector3(0.f, 0.f, upperLimit));
+}
+
+void JointConstraint::enableSpring(bool on) {
+	if (!on) {
+		disableSpring();
+		return;
+	}
 	((btGeneric6DofSpringConstraint*)this)->enableSpring(5, true);
-	setStiffness(5, GNRR::scale * .1);
-	setDamping(5, GNRR::scale * .5);
+	setStiffness(5, 1);
+	setDamping(5, 5);
 
-	btVector3 lower, upper, avg;
-	getAngularLowerLimit(lower);
-	getAngularUpperLimit(upper);
-	avg = (lower + upper) / 2;
-
-	setAngle(avg.getZ());
+	setFree();
 }
 
 void JointConstraint::disableSpring() {
-	for (int i=0;i<6;i++) {
-		((btGeneric6DofSpringConstraint*)this)->enableSpring(i, false);
-
-		btVector3 lower, upper, avg;
-		getAngularLowerLimit(lower);
-		getAngularUpperLimit(upper);
-		avg = (lower + upper) / 2;
-
-		setAngularLowerLimit(avg);
-		setAngularUpperLimit(avg);
+	if (!springEnabled(5)) {
+		return;
 	}
+
+	((btGeneric6DofSpringConstraint*)this)->enableSpring(5, false);
+	setAngle(getEquilibriumPoint(5));
 }
 
 bool JointConstraint::isSprung() {
@@ -352,7 +376,8 @@ btScalar JointConstraint::getEquilibriumPoint(int index) {
 
 ContactConstraint::ContactConstraint(btRigidBody& rb, const btTransform& frame) :
 		btGeneric6DofSpringConstraint(rb, frame, true) {
-
+	setLinearLowerLimit(btVector3(0.,0.,0.));
+	setLinearUpperLimit(btVector3(-0.00001f,-0.00001f,-0.00001f));
 }
 
 btVector3 ContactConstraint::getPoint() {
@@ -375,19 +400,35 @@ void ContactConstraint::setPoint(const btVector3& point) {
 	setLinearUpperLimit(upper);
 }
 
-void ContactConstraint::enableSpring() {
+void ContactConstraint::setFree() {
+	btScalar fudge = GNRR::scale * .03;
+	btVector3 lower, upper, avg;
+	getLinearLowerLimit(lower);
+	getLinearUpperLimit(upper);
+
+	avg = (lower + upper) / 2;
+	lower = avg;
+	upper = avg;
+
+	lower += btVector3(fudge,fudge,0);
+	upper -= btVector3(fudge,fudge,0);
+
+	setLinearLowerLimit(lower);
+	setLinearUpperLimit(upper);
+}
+
+void ContactConstraint::enableSpring(bool on) {
+	if (!on) {
+		disableSpring();
+		return;
+	}
 	for (int i=0; i<2; i++) {
 		((btGeneric6DofSpringConstraint*)this)->enableSpring(i, true);
 		setStiffness(i, GNRR::scale * 1);
 		setDamping(i, GNRR::scale * .5);
 	}
 
-	btVector3 lower, upper, avg;
-	getLinearLowerLimit(lower);
-	getLinearUpperLimit(upper);
-	avg = (lower + upper) / 2;
-
-	setPoint(avg);
+	setFree();
 }
 
 void ContactConstraint::disableSpring() {
@@ -789,12 +830,8 @@ void	GNRR::initPhysics()
 	//frameInB.setOrigin(btVector3(scale * -0.05/2,0,scale* -0.034/2));
 	frameInB.getBasis().setEulerZYX(0,0,SIMD_PI);
 
-	j_hb_11_jf4 = new JointConstraint(*handbase,*finger11,frameInA,frameInB);
-	j_hb_11_jf4->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_hb_11_jf4->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_hb_11_jf4->setAngularLowerLimit(btVector3(0.f, 0.f, -1. * SIMD_PI / 180.));
-	j_hb_11_jf4->setAngularUpperLimit(btVector3(0.f, 0.f, 180. * SIMD_PI / 180.));
+	j_hb_11_jf4 = new JointConstraint(*handbase,*finger11,frameInA,frameInB,
+			-1. * SIMD_PI / 180., 180. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_hb_11_jf4, true);
 	//j_hb_11_jf4->setDbgDrawSize(btScalar(5.f));
@@ -810,12 +847,8 @@ void	GNRR::initPhysics()
 	//frameInB.setOrigin(btVector3(scale * -0.05/2,0,scale* -0.034/2));
 	frameInB.getBasis().setEulerZYX(0,0,SIMD_PI);
 
-	j_hb_21_jf4mimic = new JointConstraint(*handbase,*finger21,frameInA,frameInB);
-	j_hb_21_jf4mimic->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_hb_21_jf4mimic->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_hb_21_jf4mimic->setAngularLowerLimit(btVector3(0.f, 0.f, -1. * SIMD_PI / 180.));
-	j_hb_21_jf4mimic->setAngularUpperLimit(btVector3(0.f, 0.f, 180. * SIMD_PI / 180.));
+	j_hb_21_jf4mimic = new JointConstraint(*handbase,*finger21,frameInA,frameInB,
+			-1. * SIMD_PI / 180., 180. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_hb_21_jf4mimic, true);
 	//j_hb_21_jf4mimic->setDbgDrawSize(btScalar(5.f));
@@ -842,12 +875,8 @@ void	GNRR::initPhysics()
 	//frameInB.setOrigin(btVector3(scale * -0.07/2,0,0));
 	frameInB.getBasis().setEulerZYX(0,0,0);
 
-	j_11_12_jf1 = new JointConstraint(*finger11,*finger12,frameInA,frameInB);
-	j_11_12_jf1->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_11_12_jf1->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_11_12_jf1->setAngularLowerLimit(btVector3(0.f, 0.f, 0. * SIMD_PI / 180.));
-	j_11_12_jf1->setAngularUpperLimit(btVector3(0.f, 0.f, 140. * SIMD_PI / 180.));
+	j_11_12_jf1 = new JointConstraint(*finger11,*finger12,frameInA,frameInB,
+			0. * SIMD_PI / 180., 140. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_11_12_jf1, true);
 	//j_11_12_jf1->setDbgDrawSize(btScalar(5.f));
@@ -864,12 +893,8 @@ void	GNRR::initPhysics()
 	//frameInB.setOrigin(btVector3(scale * -0.07/2,0,0));
 	frameInB.getBasis().setEulerZYX(0,0,0);
 
-	j_21_22_jf2 = new JointConstraint(*finger21,*finger22,frameInA,frameInB);
-	j_21_22_jf2->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_21_22_jf2->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_21_22_jf2->setAngularLowerLimit(btVector3(0.f, 0.f, 0. * SIMD_PI / 180.));
-	j_21_22_jf2->setAngularUpperLimit(btVector3(0.f, 0.f, 140. * SIMD_PI / 180.));
+	j_21_22_jf2 = new JointConstraint(*finger21,*finger22,frameInA,frameInB,
+			0. * SIMD_PI / 180., 140. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_21_22_jf2, true);
 	//j_31_22_jf2->setDbgDrawSize(btScalar(5.f));
@@ -887,12 +912,8 @@ void	GNRR::initPhysics()
 	//frameInB.setOrigin(btVector3(scale * -0.07/2,0,0));
 	frameInB.getBasis().setEulerZYX(SIMD_PI,0,0);
 
-	j_31_32_jf3 = new JointConstraint(*handbase,*finger32,frameInA,frameInB);
-	j_31_32_jf3->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_31_32_jf3->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_31_32_jf3->setAngularLowerLimit(btVector3(0.f, 0.f, 0. * SIMD_PI / 180.));
-	j_31_32_jf3->setAngularUpperLimit(btVector3(0.f, 0.f, 140. * SIMD_PI / 180.));
+	j_31_32_jf3 = new JointConstraint(*handbase,*finger32,frameInA,frameInB,
+			0. * SIMD_PI / 180., 140. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_31_32_jf3, true);
 	//j_31_32_jf3->setDbgDrawSize(btScalar(5.f));
@@ -908,12 +929,8 @@ void	GNRR::initPhysics()
 	frameInB.setIdentity();
 	//frameInB.setOrigin(btVector3(scale * -0.058/2,0,0));
 
-	j_12_13_jf1mimic = new JointConstraint(*finger12,*finger13,frameInA,frameInB);
-	j_12_13_jf1mimic->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_12_13_jf1mimic->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_12_13_jf1mimic->setAngularLowerLimit(btVector3(0.f, 0.f, 50. * SIMD_PI / 180.));
-	j_12_13_jf1mimic->setAngularUpperLimit(btVector3(0.f, 0.f, 97. * SIMD_PI / 180.));
+	j_12_13_jf1mimic = new JointConstraint(*finger12,*finger13,frameInA,frameInB,
+			50. * SIMD_PI / 180., 97. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_12_13_jf1mimic, true);
 	//j_12_13_jf1mimic->setDbgDrawSize(btScalar(5.f));
@@ -934,12 +951,8 @@ void	GNRR::initPhysics()
 	frameInB.setIdentity();
 	//frameInB.setOrigin(btVector3(scale * -0.058/2,0,0));
 
-	j_22_23_jf2mimic = new JointConstraint(*finger22,*finger23,frameInA,frameInB);
-	j_22_23_jf2mimic->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_22_23_jf2mimic->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_22_23_jf2mimic->setAngularLowerLimit(btVector3(0.f, 0.f, 50. * SIMD_PI / 180.));
-	j_22_23_jf2mimic->setAngularUpperLimit(btVector3(0.f, 0.f, 97. * SIMD_PI / 180.));
+	j_22_23_jf2mimic = new JointConstraint(*finger22,*finger23,frameInA,frameInB,
+			50. * SIMD_PI / 180., 97. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_22_23_jf2mimic, true);
 	//j_11_12_jf2mimic->setDbgDrawSize(btScalar(5.f));
@@ -962,12 +975,8 @@ void	GNRR::initPhysics()
 	//frameInB.setOrigin(btVector3(scale * -0.058/2,0,0));
 	frameInB.getBasis().setEulerZYX(SIMD_PI,0,0);
 
-	j_32_33_jf3mimic = new JointConstraint(*finger32,*finger33,frameInA,frameInB);
-	j_32_33_jf3mimic->setLinearUpperLimit(btVector3(0., 0., 0.));
-	j_32_33_jf3mimic->setLinearLowerLimit(btVector3(0., 0., 0.));
-
-	j_32_33_jf3mimic->setAngularLowerLimit(btVector3(0.f, 0.f, 50. * SIMD_PI / 180.));
-	j_32_33_jf3mimic->setAngularUpperLimit(btVector3(0.f, 0.f, 97. * SIMD_PI / 180.));
+	j_32_33_jf3mimic = new JointConstraint(*finger32,*finger33,frameInA,frameInB,
+			50. * SIMD_PI / 180., 97. * SIMD_PI / 180.);
 
 	m_dynamicsWorld->addConstraint(j_32_33_jf3mimic, true);
 	//j_21_22_jf3mimic->setDbgDrawSize(btScalar(5.f));
@@ -980,34 +989,9 @@ void	GNRR::initPhysics()
 	m_dynamicsWorld->addConstraint(jf3_gear, true);
 	}
 
-
-	/******** p2p ********/
-	if (false) {
-	btRigidBody* finger = finger23;
-
-	btVector3 pivot = (finger->getCenterOfMassTransform() * btTransform(btMatrix3x3::getIdentity(),btVector3(scale*0.058,0,0))).invXform(btVector3(0,0,scale *0.120));
-	//printf("%f %f %f\n",pivot.getX(), pivot.getY(), pivot.getZ());
-	frameInB.setIdentity();
-	frameInB.setOrigin(btVector3(scale*0.058,0,0));
-
-	p2p = new btGeneric6DofSpringConstraint(*finger,frameInB,true);
-
-	//p2p->setLinearLowerLimit(btVector3(-1,-1,-1));
-	//p2p->setLinearUpperLimit(btVector3(1,1,1));
-	p2p->setLinearLowerLimit(btVector3(pivot.getX(), pivot.getY(), pivot.getZ()));
-	p2p->setLinearUpperLimit(btVector3(pivot.getX(), pivot.getY(), pivot.getZ()));
-
-	//btPoint2PointConstraint* p2p = new btPoint2PointConstraint(*finger,pivot);
-	m_dynamicsWorld->addConstraint(p2p, true);
-	//p2p->setDbgDrawSize(btScalar(5.f));
-	p2p->setEnabled(false);
-	}
-
 	if (handbase) {
 		frameInB.setIdentity();
 		baseConstraint = new ContactConstraint(*handbase,frameInB);
-		baseConstraint->setLinearLowerLimit(btVector3(0.,0.,0.));
-		baseConstraint->setLinearUpperLimit(btVector3(-0.00001f,-0.00001f,-0.00001f));
 		m_dynamicsWorld->addConstraint(baseConstraint, true);
 	}
 
@@ -1015,8 +999,6 @@ void	GNRR::initPhysics()
 		frameInB.setIdentity();
 		frameInB.setOrigin(btVector3(scale*0.058,0,0));
 		finger1Constraint = new ContactConstraint(*finger13,frameInB);
-		finger1Constraint->setLinearLowerLimit(btVector3(0.,0.,0.));
-		finger1Constraint->setLinearUpperLimit(btVector3(-0.00001f,-0.00001f,-0.00001f));
 		m_dynamicsWorld->addConstraint(finger1Constraint, true);
 	}
 
@@ -1024,8 +1006,6 @@ void	GNRR::initPhysics()
 		frameInB.setIdentity();
 		frameInB.setOrigin(btVector3(scale*0.058,0,0));
 		finger2Constraint = new ContactConstraint(*finger23,frameInB);
-		finger2Constraint->setLinearLowerLimit(btVector3(0.,0.,0.));
-		finger2Constraint->setLinearUpperLimit(btVector3(-0.00001f,-0.00001f,-0.00001f));
 		m_dynamicsWorld->addConstraint(finger2Constraint, true);
 	}
 
@@ -1033,8 +1013,6 @@ void	GNRR::initPhysics()
 		frameInB.setIdentity();
 		frameInB.setOrigin(btVector3(scale*0.058,0,0));
 		finger3Constraint = new ContactConstraint(*finger33,frameInB);
-		finger3Constraint->setLinearLowerLimit(btVector3(0.,0.,0.));
-		finger3Constraint->setLinearUpperLimit(btVector3(-0.00001f,-0.00001f,-0.00001f));
 		m_dynamicsWorld->addConstraint(finger3Constraint, true);
 	}
 
@@ -1108,6 +1086,10 @@ HandState GNRR::getState() {
 	return HandState(this);
 }
 
+JointState GNRR::getJointState() {
+	return JointState(this);
+}
+
 void GNRR::setBaseConstraintPose(const btTransform& pose, bool constrainAngles) {
 	if (handbase && baseConstraint) {
 		btTransform frameInB = btTransform::getIdentity();
@@ -1136,7 +1118,7 @@ void GNRR::setBaseConstraintPose(const btTransform& pose, bool constrainAngles) 
 
 	}
 }
-void GNRR::releaseBaseConstraint() {
+void GNRR::unsetBaseConstraint() {
 	if (handbase && baseConstraint) {
 		btTransform frameInB = btTransform::getIdentity();
 		btTransform frameInA = handbase->getCenterOfMassTransform() * frameInB;
@@ -1201,6 +1183,29 @@ void GNRR::setFingerConstraintPose(int fingerNum, const btTransform& pose, btSca
 	}
 }
 
+void GNRR::setJointConstraints(JointState& jointState, bool spread) {
+	if (spread) {
+		getJointConstraint(1,0)->enableSpring();
+		getJointConstraint(1,0)->setAngle(jointState.getValue(1,0));
+	}
+
+	for (int i=1; i<=3; i++) {
+		getJointConstraint(i,1)->enableSpring();
+		getJointConstraint(i,1)->setAngle(jointState.getValue(i,1));
+	}
+}
+
+void GNRR::unsetJointConstraints() {
+	for (int i=1; i<=3; i++) {
+		for (int j=0; j<=2; j++) {
+			JointConstraint* constraint = getJointConstraint(i,j);
+			if (constraint) {
+				constraint->disableSpring();
+			}
+		}
+	}
+}
+
 bool GNRR::inTimeRange(float start, float stop, float& value) {
 	if (!run || m_time <= start || stop < m_time) {
 		return false;
@@ -1208,6 +1213,14 @@ bool GNRR::inTimeRange(float start, float stop, float& value) {
 		value = (m_time-start) / (stop-start);
 		return true;
 	}
+}
+
+void GNRR::addStage(stageCallback callback, float duration, const std::string& name) {
+	Stage stage;
+	stage.name = name;
+	stage.duration = duration;
+	stage.callback = callback;
+	stages.push_back(stage);
 }
 
 void GNRR::clientMoveAndDisplay()
@@ -1222,8 +1235,6 @@ void GNRR::clientMoveAndDisplay()
  		m_time += 0.03f;
  	}
 
-	HandState state = getState();
-
 	static bool once = true;
 	if (once) {
 		once = false;
@@ -1234,38 +1245,37 @@ void GNRR::clientMoveAndDisplay()
 		//printf("%f %f\n", state.getJointValue(1,1), getJointConstraint(1,1)->getAngle());
 	}
 
-	float value;
-	if (inTimeRange(0,5,value)) {
-		//printf("%f %f\n",m_time,value);
-		static bool once = true;
-		static btTransform origFingerPose[3];
-		static btTransform finalFingerPose[3];
-		if (once) {
-			for (int i=0; i<3; i++) {
-				origFingerPose[i] = state.getFingertipPose(i+1);
-
-				finalFingerPose[i].setIdentity();
-				finalFingerPose[i].getOrigin().setZ(origFingerPose[i].getOrigin().getZ());
-				finalFingerPose[i].getOrigin().setX(origFingerPose[i].getOrigin().getX()/2);
-				finalFingerPose[i].getOrigin().setY(origFingerPose[i].getOrigin().getY() * 2);
+	if (run && !stages.empty()) {
+		static size_t prevStageNum = -1;
+		float stageStart = 0;
+		float value;
+		for (size_t stageNum=0; stageNum<=stages.size(); stageNum++) {
+			if (stageNum == stages.size()) {
+				if (prevStageNum == stages.size()-1) {
+					printf("Stages finished\n");
+				}
+				prevStageNum = stageNum;
+				break;
 			}
-			once = false;
+			Stage stage = stages[stageNum];
+			float stageEnd = stageStart + stage.duration;
+			if (inTimeRange(stageStart, stageEnd, value)) {
+				bool first = stageNum != prevStageNum;
+				if (first) {
+					if (stage.name.empty()) {
+						printf("Entering stage %lu\n", stageNum);
+					} else {
+						printf("Entering stage %lu: %s\n", stageNum, stage.name.c_str());
+					}
+				}
+
+				stage.callback(this, value, first);
+
+				prevStageNum = stageNum;
+				break;
+			}
+			stageStart = stageEnd;
 		}
-
-		for (int i=0; i<3; i++) {
-			setFingerConstraintPose(i+1,interpolate(origFingerPose[i],finalFingerPose[i],value));
-		}
-
-		//printf("%s\n", state.toString().c_str());
-
-//		std::cout << state.getFingertipPose(1) << std::endl;
-//		std::cout << getFingertipPose(1) << std::endl;
-//		std::cout << std::endl;
-
-//		printf("%.3f %.3f %.3f\n",
-//				j_hb_00_jf4->getAngle(0),
-//				j_hb_00_jf4->getAngle(1),
-//				j_hb_00_jf4->getAngle(2));
 	}
 
 	{
@@ -1328,10 +1338,35 @@ void GNRR::setupConstraints(HandState& state) {
 
 	constraint->enableSpring();
 
-	for (int i=1; i<=3; i++) {
+	setJointConstraints(state.joints);
+
+//	for (int i=1; i<=3; i++) {
 //		getJointConstraint(i, 1)->enableSpring();
-		getJointConstraint(i, 2)->enableSpring();
+////		getJointConstraint(i, 2)->enableSpring();
+//	}
+}
+
+void test(GNRR* gnrr, float value, bool first) {
+	static btTransform origFingerPose[3];
+	static btTransform finalFingerPose[3];
+	if (first) {
+		for (int i=0; i<3; i++) {
+			origFingerPose[i] = gnrr->getState().getFingertipPose(i+1);
+
+			finalFingerPose[i].setIdentity();
+			finalFingerPose[i].getOrigin().setZ(origFingerPose[i].getOrigin().getZ());
+			finalFingerPose[i].getOrigin().setX(origFingerPose[i].getOrigin().getX()/2);
+			finalFingerPose[i].getOrigin().setY(origFingerPose[i].getOrigin().getY() * 2);
+		}
 	}
+
+	for (int i=0; i<3; i++) {
+		gnrr->setFingerConstraintPose(i+1,interpolate(origFingerPose[i],finalFingerPose[i],value));
+	}
+}
+
+void doNothing(GNRR* gnrr, float value, bool first) {
+
 }
 
 int main(int argc,char** argv)
@@ -1341,10 +1376,10 @@ int main(int argc,char** argv)
 	//init grasp
 
     GNRR* gnrr = new GNRR();
-
-
     gnrr->initPhysics();
 	gnrr->setDebugMode(btIDebugDraw::DBG_DrawConstraints+btIDebugDraw::DBG_DrawConstraintLimits);
+
+	gnrr->addStage(&test, 5, "test stage");
 
 	return glutmain(argc, argv,640,480,"GNRR",gnrr);
 }

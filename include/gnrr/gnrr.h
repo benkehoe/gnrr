@@ -15,6 +15,9 @@ subject to the following restrictions:
 #ifndef CONSTRAINT_DEMO_H
 #define CONSTRAINT_DEMO_H
 
+#include <vector>
+#include <string>
+
 #include "OpenGL/GlutDemoApplication.h"
 #define PlatformDemoApplication GlutDemoApplication
 
@@ -48,6 +51,7 @@ struct HandState {
 
 	JointState joints;
 
+	HandState(const btTransform& basePose, const JointState& jointState);
 	HandState(const GNRR* gnrr);
 	void update(const GNRR* gnrr);
 
@@ -60,13 +64,18 @@ struct HandState {
 
 class JointConstraint : public btGeneric6DofSpringConstraint {
 public:
-	JointConstraint(btRigidBody& rA, btRigidBody& rB, const btTransform& frameInA, const btTransform& frameInB);
+	JointConstraint(btRigidBody& rA, btRigidBody& rB, const btTransform& frameInA, const btTransform& frameInB, btScalar lowerLimit, btScalar upperLimit);
+
+	btScalar lowerLimit;
+	btScalar upperLimit;
 
 	btScalar getAngle();
 	btScalar getAngle(int index);
 	void setAngle(btScalar angle);
 
-	void enableSpring();
+	void setFree();
+
+	void enableSpring(bool on=true);
 	void disableSpring();
 	bool isSprung();
 
@@ -83,7 +92,9 @@ public:
 	btVector3 getPoint();
 	void setPoint(const btVector3& point);
 
-	void enableSpring();
+	void setFree();
+
+	void enableSpring(bool on=true);
 	void disableSpring();
 	bool isSprung();
 
@@ -91,6 +102,13 @@ public:
 	bool getStiffness(int index);
 	bool getDamping(int index);
 	btScalar getEquilibriumPoint(int index);
+};
+
+typedef void(*stageCallback)(GNRR*, float, bool); //GNRR* gnrr, float value, bool first
+struct Stage {
+	std::string name;
+	float duration;
+	stageCallback callback;
 };
 
 class GNRR : public PlatformDemoApplication
@@ -112,6 +130,10 @@ class GNRR : public PlatformDemoApplication
 	void clientResetScene();
 
 	void setupConstraints(HandState& state);
+
+	std::vector<Stage> stages;
+
+	std::vector<float> getStageStartTimes();
 
 public:
 
@@ -142,11 +164,17 @@ public:
 	// for cone-twist motor driving
 	float m_time;
 
+	void addStage(stageCallback callback, float duration, const std::string& name="");
+
 	HandState getState();
+	JointState getJointState();
 	
 	void setBaseConstraintPose(const btTransform& pose, bool constrainAngles=false);
-	void releaseBaseConstraint();
+	void unsetBaseConstraint();
 	void setFingerConstraintPose(int finger, const btTransform& pose, btScalar angle=0, bool constrainAngles=false);
+
+	void setJointConstraints(JointState& jointState, bool spread=true);
+	void unsetJointConstraints();
 
 //	void 	enableSpring (int index, bool onOff)
 //	void 	setStiffness (int index, btScalar stiffness)
